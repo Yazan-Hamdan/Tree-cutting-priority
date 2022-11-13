@@ -33,11 +33,13 @@ class ShapeFilesDirectoryHandler:
         Returns: files_data: [dict] where key is the name of the file,
                                     value is the data stored in that file
 
-        Note:
-
         """
         shape_files = self.__get_shapefiles()
         files_data = {
-            filename: ogr.Open(os.path.join(self.__directory_path, filename))
+            # -4 to exclude extension name from file name
+            filename[:-4]: ogr.Open(os.path.join(self.__directory_path,
+                                                 filename))
             for filename in shape_files}
         return files_data
+
+
