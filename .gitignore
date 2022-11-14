@@ -130,3 +130,8 @@ dmypy.json
 
 # pyCharm
 .idea/
+
+# code output
+*.tiff
+*.tif
+*.xml
