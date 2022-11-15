@@ -24,6 +24,7 @@ class ShapeFilesDirectoryHandler:
         """
         shape_files = [f for f in os.listdir(self.__directory_path) if
                        f.endswith('.shp')]
+
         return shape_files
 
     def read_shapefiles(self) -> dict:
@@ -40,6 +41,7 @@ class ShapeFilesDirectoryHandler:
             filename[:-4]: ogr.Open(os.path.join(self.__directory_path,
                                                  filename))
             for filename in shape_files}
+
         return files_data
 
 

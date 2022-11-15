@@ -1,3 +1,5 @@
+from typing import List, Union
+
 from osgeo import gdal
 import argparse
 import numpy as np
@@ -7,15 +9,18 @@ from utils.shape_files_directory_handler import ShapeFilesDirectoryHandler
 NO_DATA_VALUE = -9999
 
 
-def get_classification_ranges(min_val, max_val) -> list[tuple[float, float]]:
+def get_classification_ranges(
+        min_val: Union[float, int],
+        max_val: Union[float, int]
+        ) -> List[tuple[float, float]]:
     """ Splits values into ranges to classify into 9 categories.
 
     Args:
-        min (number): Minimum values of the data.
-        max (number): Maximum value of the data.
+        min_val: [number] Minimum values of the data.
+        max_val: [number] Maximum value of the data.
 
     Returns:
-        list[tuple[float, float]]: The ranges to classify with.
+        List[tuple[float, float]]: The ranges to classify with.
     """
     data_range = (max_val - min_val) / 9
     return [(min_val + (data_range * i), min_val + (data_range * (i + 1)))
@@ -38,8 +43,8 @@ def classify_band(band) -> None:
     for val_range in ranges:
         data_selection = \
             (final_data >= val_range[0]) & (final_data < val_range[1]) \
-            if val_range[0] != ranges[-1][0] else \
-            (final_data >= val_range[0]) & (final_data <= val_range[1])
+            if val_range[0] != ranges[-1][0] \
+            else (final_data >= val_range[0]) & (final_data <= val_range[1])
 
         final_data[data_selection] = current_class
         current_class += 1
@@ -47,12 +52,8 @@ def classify_band(band) -> None:
     band.WriteArray(final_data)
 
 
-def rasterize_shapefile(
-    shape_file,
-    raster_file_name,
-    call_back,
-    **args
-) -> gdal.Dataset:
+def rasterize_shapefile(shape_file, raster_file_name, call_back,
+                        **args) -> gdal.Dataset:
     """ Rasterize vector shape file.
 
         Args:
@@ -94,18 +95,16 @@ def calculate_raster_distance(target_ds):
             target_ds: The created GeoTiff file.
     """
     band = target_ds.GetRasterBand(1)
-    gdal.ComputeProximity(band, band, options=[
-                          'VALUES=0', 'DISTUNITS=GEO', 'MAXDIST=100'])
+    gdal.ComputeProximity(band, band,
+                          options=['VALUES=0', 'DISTUNITS=GEO', 'MAXDIST=100'])
     classify_band(band)
 
 
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument(
-        "-sp",
-        "--shape_path",
-        help="The absolute path to the shape files.",
-        required='true')
+    arg_parser.add_argument("-sp", "--shape_path",
+                            help="The absolute path to the shape files.",
+                            required=True)
 
     cmd_args = arg_parser.parse_args()
 
@@ -119,11 +118,9 @@ if __name__ == '__main__':
     #                     calculate_raster_distance, burn_values=[0])
 
     # Data with values included
-    rasterize_shapefile(
-        egress_shape_file,
-        "testy.tiff",
-        lambda target_ds: classify_band(target_ds.GetRasterBand(1)),
-        options=['ATTRIBUTE=pop_per_sq']
-    )
+    rasterize_shapefile(egress_shape_file, "testy.tiff",
+                        lambda target_ds: classify_band(
+                            target_ds.GetRasterBand(1)),
+                        options=['ATTRIBUTE=pop_per_sq'])
 
     print(shape_files.keys())
