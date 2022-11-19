@@ -148,7 +148,7 @@ if __name__ == '__main__':
             projection = ds.GetProjection()
 
         band_as_arr: np.array = np.array(ds.GetRasterBand(1).ReadAsArray())
-        band_as_arr[band_as_arr == NO_DATA_VALUE] = 0
+        band_as_arr[band_as_arr == NO_DATA_VALUE] = 1
 
         if output_raster is not None:
             output_raster += band_as_arr * details["weight"]

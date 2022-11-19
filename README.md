@@ -17,3 +17,9 @@ creek. A cutting grid feature has been created for the town of Fire creek. The f
 output of this exercise will be a GRID divided into zones based on the cutting feature
 class. Each zone will have a tree cutting priority value. Following the spatial analysis
 framework used in the first project in order to undertake the spatial analysis.
+
+
+# Running the program
+```
+python main.py -sb <abs_path_data>
+```
