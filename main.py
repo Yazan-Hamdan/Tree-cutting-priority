@@ -67,7 +67,6 @@ def rasterize_shapefile(shape_file: gdal.Dataset, raster_file_name: str,
         Args:
             shape_file: The shape file to rasterize.
             raster_file_name: The output filename of the raster.
-            call_back: Optional call back function after rasterization.
             args: Extra arguments to the rasterization method.
 
         Returns:
