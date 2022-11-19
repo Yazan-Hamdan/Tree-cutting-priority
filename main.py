@@ -53,9 +53,9 @@ def classify_band(band: gdal.Band, reverse=False) -> None:
         final_data[data_selection] = current_class
 
         if reverse:
-            current_class += 1
-        else:
             current_class -= 1
+        else:
+            current_class += 1
 
     band.WriteArray(final_data)
 
@@ -148,16 +148,18 @@ if __name__ == '__main__':
         if projection is None:
             projection = ds.GetProjection()
 
+        band_as_arr: np.array = np.array(ds.GetRasterBand(1).ReadAsArray())
+        band_as_arr[band_as_arr == NO_DATA_VALUE] = 0
+
         if output_raster is not None:
-            output_raster += np.array(ds.GetRasterBand(1).ReadAsArray()
-                                      ) * details["weight"]
+            output_raster += band_as_arr * details["weight"]
         else:
-            output_raster = np.array(ds.GetRasterBand(
-                1).ReadAsArray()) * details["weight"]
+            output_raster = band_as_arr * details["weight"]
 
     end_ds: gdal.Dataset = gdal.GetDriverByName('GTiff').Create(
         "final.tiff", RASTER_WIDTH, RASTER_HEIGHT, 1, gdal.GDT_Float32)
 
+    # output_raster[output_raster == 0] = NO_DATA_VALUE
     end_ds.SetGeoTransform(geo_transform)
     end_ds.SetProjection(projection)
     end_band: gdal.Band = end_ds.GetRasterBand(1)
