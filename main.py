@@ -40,8 +40,23 @@ def classify_band(band: gdal.Band, reverse=False) -> None:
     [data_min, data_max, _, __] = band.GetStatistics(True, True)
 
     band_data = np.array(band.ReadAsArray())
+
+    new_band_data = classify_arr(band_data, reverse, data_min, data_max)
+
+    band.WriteArray(new_band_data)
+
+
+def classify_arr(arr: np.ndarray, reverse: bool, min: int, max: int) -> np.ndarray:
+    """Classify arr values.
+
+    Args:
+        arr (gdal.Band): The array band to classify.
+        reverse (bool, optional): Whether to reverse classification values.
+        Defaults to False.
+    """
+    band_data = arr
     final_data = band_data.copy()
-    ranges = get_classification_ranges(data_min, data_max)
+    ranges = get_classification_ranges(min, max)
     current_class = 1 if not reverse else 9
 
     for val_range in ranges:
@@ -57,7 +72,7 @@ def classify_band(band: gdal.Band, reverse=False) -> None:
         else:
             current_class += 1
 
-    band.WriteArray(final_data)
+    return final_data
 
 
 def rasterize_shapefile(shape_file: gdal.Dataset, raster_file_name: str,
@@ -103,6 +118,56 @@ def calculate_raster_distance(target_ds: gdal.Dataset):
     classify_band(band, True)
 
 
+def split_size_into(size: int, split_into=5) -> list[tuple[int]]:
+    curr_min = 0
+    sizes: list = []
+
+    for split in range(1, split_into + 1):
+        min_to_use = curr_min
+        max_to_use = (int)((split / split_into) *
+                           size) if split != split_into else size
+
+        sizes.append((min_to_use, max_to_use))
+        curr_min = max_to_use
+
+    return sizes
+
+
+def blockify_matrix(mat: np.ndarray) -> tuple[list[tuple[int]]]:
+    (x, y) = mat.shape
+
+    return (split_size_into(x), split_size_into(y))
+
+
+def zonal_avg(mat: np.ndarray) -> np.ndarray:
+    (xs, ys) = blockify_matrix(output_raster)
+    zonal_mat = mat.copy()
+
+    for x in xs:
+        for y in ys:
+            temp = mat[x[0]: x[1], y[0]: y[1]]
+            zonal_mat[x[0]: x[1], y[0]: y[1]] = np.average(temp)
+
+    return zonal_mat
+
+
+def save_arr_as_raster(
+    name: str,
+    geo_transform: tuple[float, float, float, float, float, float],
+    projection: str,
+    arr: np.ndarray
+) -> None:
+    end_ds: gdal.Dataset = gdal.GetDriverByName('GTiff').Create(
+        name, RASTER_WIDTH, RASTER_HEIGHT, 1, gdal.GDT_Float32)
+
+    end_ds.SetGeoTransform(geo_transform)
+    end_ds.SetProjection(projection)
+    end_band: gdal.Band = end_ds.GetRasterBand(1)
+    end_band.SetNoDataValue(NO_DATA_VALUE)
+    end_band.WriteArray(arr, 0, 0)
+    end_band.FlushCache()
+
+
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("-sp", "--shape_path",
@@ -122,7 +187,7 @@ if __name__ == '__main__':
         "SBNFMortalityt": {"weight": 0.1, "column_to_use": "tot_mortal"},
     }
 
-    output_raster: np.array = None
+    output_raster: np.ndarray = None
     geo_transform: tuple[float, float, float, float, float, float] = None
     projection: str = None
 
@@ -147,7 +212,7 @@ if __name__ == '__main__':
         if projection is None:
             projection = ds.GetProjection()
 
-        band_as_arr: np.array = np.array(ds.GetRasterBand(1).ReadAsArray())
+        band_as_arr: np.ndarray = np.array(ds.GetRasterBand(1).ReadAsArray())
         band_as_arr[band_as_arr == NO_DATA_VALUE] = 1
 
         if output_raster is not None:
@@ -155,18 +220,24 @@ if __name__ == '__main__':
         else:
             output_raster = band_as_arr * details["weight"]
 
-    end_ds: gdal.Dataset = gdal.GetDriverByName('GTiff').Create(
-        "final.tiff", RASTER_WIDTH, RASTER_HEIGHT, 1, gdal.GDT_Float32)
+    # end_ds: gdal.Dataset = gdal.GetDriverByName('GTiff').Create(
+    #     "final.tiff", RASTER_WIDTH, RASTER_HEIGHT, 1, gdal.GDT_Float32)
 
     # output_raster[output_raster == 0] = NO_DATA_VALUE
-    end_ds.SetGeoTransform(geo_transform)
-    end_ds.SetProjection(projection)
-    end_band: gdal.Band = end_ds.GetRasterBand(1)
-    end_band.SetNoDataValue(NO_DATA_VALUE)
-    end_band.WriteArray(output_raster, 0, 0)
-    end_band.FlushCache()
+    # end_ds.SetGeoTransform(geo_transform)
+    # end_ds.SetProjection(projection)
+    # end_band: gdal.Band = end_ds.GetRasterBand(1)
+    # end_band.SetNoDataValue(NO_DATA_VALUE)
+    # end_band.WriteArray(output_raster, 0, 0)
+    # end_band.FlushCache()
+    save_arr_as_raster("final.tiff", geo_transform, projection, output_raster)
 
-    del end_band
-    del end_ds
+    zonal_data = zonal_avg(output_raster)
 
+    save_arr_as_raster("zonal_avg.tiff", geo_transform, projection, zonal_data)
+    save_arr_as_raster("zonal_avg_classified.tiff", geo_transform, projection, classify_arr(
+        zonal_data, False, zonal_data.min(), zonal_data.max()))
+
+    print(output_raster.shape)
+    print(zonal_avg(output_raster))
     print(shape_files.keys())
