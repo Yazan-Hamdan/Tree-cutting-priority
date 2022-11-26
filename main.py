@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Union, Tuple
 
 from osgeo import gdal
 import argparse
@@ -14,7 +14,7 @@ RASTER_HEIGHT = 221
 def get_classification_ranges(
         min_val: Union[float, int],
         max_val: Union[float, int]
-) -> List[tuple[float, float]]:
+) -> List[Tuple[float, float]]:
     """ Splits values into ranges to classify into 9 categories.
 
     Args:
@@ -22,7 +22,7 @@ def get_classification_ranges(
         max_val: [number] Maximum value of the data.
 
     Returns:
-        List[tuple[float, float]]: The ranges to classify with.
+        List[Tuple[float, float]]: The ranges to classify with.
     """
     data_range = (max_val - min_val) / 9
     return [(min_val + (data_range * i), min_val + (data_range * (i + 1)))
@@ -46,13 +46,16 @@ def classify_band(band: gdal.Band, reverse=False) -> None:
     band.WriteArray(new_band_data)
 
 
-def classify_arr(arr: np.ndarray, reverse: bool, min: int, max: int) -> np.ndarray:
+def classify_arr(arr: np.ndarray, reverse: bool,
+                 min: int, max: int) -> np.ndarray:
     """Classify arr values.
 
     Args:
         arr (gdal.Band): The array band to classify.
         reverse (bool, optional): Whether to reverse classification values.
         Defaults to False.
+        min: (int): The lower bound of the resulting array
+        max: (int): The upper bound of the resulting array
     """
     band_data = arr
     final_data = band_data.copy()
@@ -118,14 +121,14 @@ def calculate_raster_distance(target_ds: gdal.Dataset):
     classify_band(band, True)
 
 
-def split_size_into(size: int, split_into=5) -> list[tuple[int]]:
+def split_size_into(size: int, split_into=5) -> List[Tuple[int]]:
     curr_min = 0
-    sizes: list = []
+    sizes: List = []
 
     for split in range(1, split_into + 1):
         min_to_use = curr_min
-        max_to_use = (int)((split / split_into) *
-                           size) if split != split_into else size
+        max_to_use = int((split / split_into) *
+                         size) if split != split_into else size
 
         sizes.append((min_to_use, max_to_use))
         curr_min = max_to_use
@@ -133,7 +136,7 @@ def split_size_into(size: int, split_into=5) -> list[tuple[int]]:
     return sizes
 
 
-def blockify_matrix(mat: np.ndarray) -> tuple[list[tuple[int]]]:
+def blockify_matrix(mat: np.ndarray) -> Tuple[List[Tuple[int]]]:
     (x, y) = mat.shape
 
     return (split_size_into(x), split_size_into(y))
@@ -153,7 +156,7 @@ def zonal_avg(mat: np.ndarray) -> np.ndarray:
 
 def save_arr_as_raster(
     name: str,
-    geo_transform: tuple[float, float, float, float, float, float],
+    geo_transform: Tuple[float, float, float, float, float, float],
     projection: str,
     arr: np.ndarray
 ) -> None:
@@ -188,7 +191,7 @@ if __name__ == '__main__':
     }
 
     output_raster: np.ndarray = None
-    geo_transform: tuple[float, float, float, float, float, float] = None
+    geo_transform: Tuple[float, float, float, float, float, float] = None
     projection: str = None
 
     for feature, details in wanted_features.items():
@@ -220,24 +223,12 @@ if __name__ == '__main__':
         else:
             output_raster = band_as_arr * details["weight"]
 
-    # end_ds: gdal.Dataset = gdal.GetDriverByName('GTiff').Create(
-    #     "final.tiff", RASTER_WIDTH, RASTER_HEIGHT, 1, gdal.GDT_Float32)
-
-    # output_raster[output_raster == 0] = NO_DATA_VALUE
-    # end_ds.SetGeoTransform(geo_transform)
-    # end_ds.SetProjection(projection)
-    # end_band: gdal.Band = end_ds.GetRasterBand(1)
-    # end_band.SetNoDataValue(NO_DATA_VALUE)
-    # end_band.WriteArray(output_raster, 0, 0)
-    # end_band.FlushCache()
     save_arr_as_raster("final.tiff", geo_transform, projection, output_raster)
 
     zonal_data = zonal_avg(output_raster)
 
     save_arr_as_raster("zonal_avg.tiff", geo_transform, projection, zonal_data)
-    save_arr_as_raster("zonal_avg_classified.tiff", geo_transform, projection, classify_arr(
-        zonal_data, False, zonal_data.min(), zonal_data.max()))
-
-    print(output_raster.shape)
-    print(zonal_avg(output_raster))
-    print(shape_files.keys())
+    save_arr_as_raster("zonal_avg_classified.tiff",
+                       geo_transform, projection,
+                       classify_arr(zonal_data, False,
+                                    zonal_data.min(), zonal_data.max()))
